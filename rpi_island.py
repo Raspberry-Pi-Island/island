@@ -21,14 +21,14 @@ def get_cl_parameters() -> argparse.Namespace:
     return args
 
 
-def print_cl_parameters(cl_parameters: argparse.Namespace):
+def print_cl_parameters(params: argparse.Namespace):
     print("-" * 50)
-    print(f"CLIENT LINK TYPE: {cl_parameters.client_link_t}")
-    print(f"CLIENT ADDRESS: {cl_parameters.client_addr}")
-    print(f"CLIENT NETMASK BYTES: {cl_parameters.client_addr_network_bytes}")
-    print(f"GATEWAY LINK TYPE: {cl_parameters.gateway_link_t}")
-    print(f"GATEWAY ADDRESS: {cl_parameters.gateway_addr}")
-    print(f"GATEWAY NETMASK BYTES: {cl_parameters.gateway_addr_network_bytes}")
+    print(f"CLIENT LINK TYPE: {params.client_link_t}")
+    print(f"CLIENT ADDRESS: {params.client_addr}")
+    print(f"CLIENT NETMASK BYTES: {params.client_addr_network_bytes}")
+    print(f"GATEWAY LINK TYPE: {params.gateway_link_t}")
+    print(f"GATEWAY ADDRESS: {params.gateway_addr}")
+    print(f"GATEWAY NETMASK BYTES: {params.gateway_addr_network_bytes}")
     print("-" * 50)
 
 
@@ -81,6 +81,13 @@ def set_network(
         return False
 
 
+def disable_dhcp_client() -> bool:
+    print("DISABLING DHCP CLIENT:")
+
+    dhcp_client = RTDhcpClient()
+    return dhcp_client.disable()
+
+
 def set_dhcp_server(
     gateway_addr: RTIpv4Address,
     gateway_link_t: str,
@@ -108,48 +115,40 @@ def set_firewall() -> bool:
     )
 
 
-def main(cl_parameters: argparse.Namespace) -> int:
-    client_addr = init_address(
-        cl_parameters.client_addr_network_bytes, cl_parameters.client_addr
-    )
-    gateway_addr = init_address(
-        cl_parameters.gateway_addr_network_bytes, cl_parameters.gateway_addr
-    )
+def main(params: argparse.Namespace) -> int:
+    client_addr = init_address(params.client_addr_network_bytes, params.client_addr)
+    gateway_addr = init_address(params.gateway_addr_network_bytes, params.gateway_addr)
 
-    success: bool = set_network(
-        cl_parameters.client_link_t,
-        cl_parameters.gateway_link_t,
+    net_is_configured: bool = set_network(
+        params.client_link_t,
+        params.gateway_link_t,
         client_addr,
         gateway_addr,
     )
 
-    if success:
-        dhcp_client = RTDhcpClient()
+    if (
+        net_is_configured
+        and disable_dhcp_client()
+        and set_dhcp_server(gateway_addr, params.gateway_link_t)
+        and set_firewall()
+    ):
+        return 0
 
-        print("DISABLING DHCP CLIENT:")
-        if dhcp_client.disable():
-            success: bool = set_dhcp_server(gateway_addr, cl_parameters.gateway_link_t)
-
-            if success:
-                set_firewall()
+    return -1
 
 
 if __name__ == "__main__":
-    cl_parameters = get_cl_parameters()
-    print_cl_parameters(cl_parameters)
+    params = get_cl_parameters()
+    print_cl_parameters(params)
 
-    if cl_parameters.client_link_t == cl_parameters.gateway_link_t:
+    if params.client_link_t == params.gateway_link_t:
         print("link_t cannot be equal!")
         exit(-1)
 
     try:
-        cl_parameters.client_addr_network_bytes = int(
-            cl_parameters.client_addr_network_bytes
-        )
-        cl_parameters.gateway_addr_network_bytes = int(
-            cl_parameters.gateway_addr_network_bytes
-        )
+        params.client_addr_network_bytes = int(params.client_addr_network_bytes)
+        params.gateway_addr_network_bytes = int(params.gateway_addr_network_bytes)
     except ValueError:
         raise ValueError
 
-    main(cl_parameters)
+    exit(main(params))
