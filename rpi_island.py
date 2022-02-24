@@ -1,6 +1,7 @@
 from rpi_router.router_cmd import *
 from rpi_router.router_data import *
 
+from sys import exit
 from pathlib import Path
 import argparse
 
@@ -21,22 +22,18 @@ def get_cl_parameters() -> argparse.Namespace:
 
 
 def print_cl_parameters(cl_parameters: argparse.Namespace):
-    log("-" * 50)
-    log(f"CLIENT LINK TYPE: {cl_parameters.client_link_t}")
-    log(f"CLIENT ADDRESS: {cl_parameters.client_addr}")
-    log(f"CLIENT NETMASK BYTES: {cl_parameters.client_addr_network_bytes}")
-    log(f"GATEWAY LINK TYPE: {cl_parameters.gateway_link_t}")
-    log(f"GATEWAY ADDRESS: {cl_parameters.gateway_addr}")
-    log(f"GATEWAY NETMASK BYTES: {cl_parameters.gateway_addr_network_bytes}")
-    log("-" * 50)
-
-
-def log(message):
-    print(message)
+    print("-" * 50)
+    print(f"CLIENT LINK TYPE: {cl_parameters.client_link_t}")
+    print(f"CLIENT ADDRESS: {cl_parameters.client_addr}")
+    print(f"CLIENT NETMASK BYTES: {cl_parameters.client_addr_network_bytes}")
+    print(f"GATEWAY LINK TYPE: {cl_parameters.gateway_link_t}")
+    print(f"GATEWAY ADDRESS: {cl_parameters.gateway_addr}")
+    print(f"GATEWAY NETMASK BYTES: {cl_parameters.gateway_addr_network_bytes}")
+    print("-" * 50)
 
 
 def init_address(addr_network_bytes: int, address_as_str: str):
-    log("\nSETTING ADDRESS:")
+    print("\nSETTING ADDRESS:")
 
     parsed_address = address_as_str.split(".")
 
@@ -49,7 +46,7 @@ def init_address(addr_network_bytes: int, address_as_str: str):
             parsed_address[3],
         )
 
-        log(address.address)
+        print(address.address)
         return address
     else:
         return None
@@ -61,7 +58,7 @@ def set_network(
     client_addr: RTIpv4Address,
     gateway_addr: RTIpv4Address,
 ) -> bool:
-    log("\nSETTING NETWORK INTERFACES:")
+    print("\nSETTING NETWORK INTERFACES:")
 
     if client_addr != None and gateway_addr != None:
         conf_directory = RTPath(Path("/", "etc", "network", "interfaces.d"))
@@ -72,9 +69,10 @@ def set_network(
         conf_directory.go()
 
         conf_directory.get_file(client_link_t).set_address()
-        log(conf_directory.get_current_dir())
+        print(conf_directory.get_current_dir())
+
         conf_directory.get_file(gateway_link_t).set_address()
-        log(conf_directory.get_current_dir())
+        print(conf_directory.get_current_dir())
 
         conf_directory.goback()
 
@@ -87,7 +85,7 @@ def set_dhcp_server(
     gateway_addr: RTIpv4Address,
     gateway_link_t: str,
 ) -> bool:
-    log("\nSETTING DHCP SERVER:")
+    print("\nSETTING DHCP SERVER:")
 
     if gateway_addr != None:
         dhcp_server = RTDhcpServer(gateway_addr, gateway_link_t)
@@ -100,7 +98,7 @@ def set_dhcp_server(
 
 
 def set_firewall() -> bool:
-    log("\nSETTING FIREWALL:")
+    print("\nSETTING FIREWALL:")
     firewall = RTFireWall()
 
     return (
@@ -110,22 +108,13 @@ def set_firewall() -> bool:
     )
 
 
-def main() -> int:
-    cl_parameters = get_cl_parameters()
-    print_cl_parameters(cl_parameters)
-
-    if cl_parameters.client_link_t == cl_parameters.gateway_link_t:
-        print("link_t cannot be equal!")
-        return -1
-
-    try:
-        client_addr_network_bytes = int(cl_parameters.client_addr_network_bytes)
-        gateway_addr_network_bytes = int(cl_parameters.gateway_addr_network_bytes)
-    except ValueError:
-        raise ValueError
-
-    client_addr = init_address(client_addr_network_bytes, cl_parameters.client_addr)
-    gateway_addr = init_address(gateway_addr_network_bytes, cl_parameters.gateway_addr)
+def main(cl_parameters: argparse.Namespace) -> int:
+    client_addr = init_address(
+        cl_parameters.client_addr_network_bytes, cl_parameters.client_addr
+    )
+    gateway_addr = init_address(
+        cl_parameters.gateway_addr_network_bytes, cl_parameters.gateway_addr
+    )
 
     success: bool = set_network(
         cl_parameters.client_link_t,
@@ -137,7 +126,7 @@ def main() -> int:
     if success:
         dhcp_client = RTDhcpClient()
 
-        log("DISABLING DHCP CLIENT:")
+        print("DISABLING DHCP CLIENT:")
         if dhcp_client.disable():
             success: bool = set_dhcp_server(gateway_addr, cl_parameters.gateway_link_t)
 
@@ -146,4 +135,21 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    main()
+    cl_parameters = get_cl_parameters()
+    print_cl_parameters(cl_parameters)
+
+    if cl_parameters.client_link_t == cl_parameters.gateway_link_t:
+        print("link_t cannot be equal!")
+        exit(-1)
+
+    try:
+        cl_parameters.client_addr_network_bytes = int(
+            cl_parameters.client_addr_network_bytes
+        )
+        cl_parameters.gateway_addr_network_bytes = int(
+            cl_parameters.gateway_addr_network_bytes
+        )
+    except ValueError:
+        raise ValueError
+
+    main(cl_parameters)
