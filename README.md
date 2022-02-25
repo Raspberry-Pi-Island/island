@@ -3,14 +3,16 @@
 ## About
 --------------
 
-`Raspberry Pi: Network Island` is a script that bridges your device's network interface
-and the network switch you're connecting to.
+`Raspberry Pi: Network Island` is a script that bridges your device's network interface to a switch or router.
 
-Whether `ethernet` or `wireless` connection is available, but your device doesn't match
-the switch interface, `Raspberry Pi: Network Island` allows you to be online either way!
+Using automation and relying on linux, `Raspberry Pi: Network Island` sets a subnetwork
+out of a static IP address, working as a proxy between your device and the external network.
+Converting an interface to another.
 
-Using native Raspberry Pi network and relying on automation, `Raspberry Pi: Network Island` builds different subnetworks,
-also allowing different types of interfaces.
+Example:
+
+Imagine that your device doesn't have a wireless adapter. You could connect 
+to your Raspberry Pi by cable, run this script and be online in a few minutes!
 
 ## Usage:
 --------------
