@@ -113,18 +113,23 @@ def set_firewall() -> bool:
     )
 
 
-def main(params: argparse.Namespace) -> int:
+def set_gateway_link_t(params: argparse.Namespace):
     gateway_link_t = ""
-
-    external_addr = init_address(params.external_network_bytes, params.external_addr)
-    gateway_addr = init_address(params.gateway_network_bytes, params.gateway_addr)
-
     if params.link_t.startswith("wlan"):
         interface_number: str = params.link_t.split("wlan")[1]
         gateway_link_t = f"eth{interface_number}"
     elif params.link_t.startswith("eth"):
         interface_number: str = params.link_t.split("eth")[1]
         gateway_link_t = f"wlan{interface_number}"
+
+    return gateway_link_t
+
+
+def main(params: argparse.Namespace) -> int:
+    external_addr = init_address(params.external_network_bytes, params.external_addr)
+    gateway_addr = init_address(params.gateway_network_bytes, params.gateway_addr)
+
+    gateway_link_t = set_gateway_link_t(params)
 
     net_is_configured: bool = set_network(
         params.link_t,
