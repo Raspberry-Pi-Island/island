@@ -1,12 +1,10 @@
-from rpi_router.router_cmd import *
-from rpi_router.router_data import *
+from rpi_router.src import (RTNetInterface, RTDhcpClient, RTDhcpServer, RTFireWall, RTIpv4Address)
 
 from sys import exit
-from pathlib import Path
 import argparse
 
 
-def get_cl_parameters() -> argparse.Namespace:
+def _get_cl_parameters() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("link_t", help="external link type")
@@ -20,7 +18,7 @@ def get_cl_parameters() -> argparse.Namespace:
     return args
 
 
-def print_cl_parameters(params: argparse.Namespace):
+def _print_cl_parameters(params: argparse.Namespace):
     print("-" * 50)
     print(f"EXTERNAL LINK TYPE: {params.link_t}")
     print(f"EXTERNAL IP ADDRESS: {params.external_addr}")
@@ -28,6 +26,18 @@ def print_cl_parameters(params: argparse.Namespace):
     print(f"RASPBERRY AS A GATEWAY ADDRESS: {params.gateway_addr}")
     print(f"GATEWAY NETMASK BYTES: {params.gateway_network_bytes}")
     print("-" * 50)
+
+
+def _get_gateway_link_t(external_addr_link_t: str):
+    gateway_link_t = ""
+    if external_addr_link_t.startswith("wlan"):
+        interface_number: str = external_addr_link_t.split("wlan")[1]
+        gateway_link_t = f"eth{interface_number}"
+    elif external_addr_link_t.startswith("eth"):
+        interface_number: str = external_addr_link_t.split("eth")[1]
+        gateway_link_t = f"wlan{interface_number}"
+
+    return gateway_link_t
 
 
 def init_address(addr_network_bytes: int, address_as_str: str):
@@ -59,20 +69,11 @@ def set_network(
     print("\nSETTING NETWORK INTERFACES:")
 
     if external_addr != None and gateway_addr != None:
-        conf_directory = RTPath(Path("/", "etc", "network", "interfaces.d"))
+        external_interface: RTNetInterface = RTNetInterface(external_addr, client_link_t, True)
+        gateway_interface: RTNetInterface = RTNetInterface(gateway_addr, gateway_link_t, False)
 
-        conf_directory.append(RTNetFile(external_addr, client_link_t, True))
-        conf_directory.append(RTNetFile(gateway_addr, gateway_link_t, False))
-
-        conf_directory.go()
-
-        conf_directory.get_file(client_link_t).set_address()
-        print(conf_directory.get_current_dir())
-
-        conf_directory.get_file(gateway_link_t).set_address()
-        print(conf_directory.get_current_dir())
-
-        conf_directory.goback()
+        external_interface.set_interface()
+        gateway_interface.set_interface()
 
         return True
     else:
@@ -106,40 +107,20 @@ def set_firewall() -> bool:
     print("\nSETTING FIREWALL:")
     firewall = RTFireWall()
 
-    return (
-        firewall.install()
+    return (firewall.install()
         and firewall.allow_dhcp_traffic()
-        and firewall.enable_package_forwarding()
-    )
-
-
-def set_gateway_link_t(params: argparse.Namespace):
-    gateway_link_t = ""
-    if params.link_t.startswith("wlan"):
-        interface_number: str = params.link_t.split("wlan")[1]
-        gateway_link_t = f"eth{interface_number}"
-    elif params.link_t.startswith("eth"):
-        interface_number: str = params.link_t.split("eth")[1]
-        gateway_link_t = f"wlan{interface_number}"
-
-    return gateway_link_t
+        and firewall.enable_package_forwarding())
 
 
 def main(params: argparse.Namespace) -> int:
     external_addr = init_address(params.external_network_bytes, params.external_addr)
     gateway_addr = init_address(params.gateway_network_bytes, params.gateway_addr)
+    gateway_link_t = _get_gateway_link_t(params)
 
-    gateway_link_t = set_gateway_link_t(params)
-
-    net_is_configured: bool = set_network(
-        params.link_t,
-        gateway_link_t,
-        external_addr,
-        gateway_addr,
-    )
+    network_is_configured: bool = set_network(params.link_t, gateway_link_t, external_addr,gateway_addr)
 
     if (
-        net_is_configured
+        network_is_configured
         and disable_dhcp_client()
         and set_dhcp_server(gateway_addr, gateway_link_t)
         and set_firewall()
@@ -150,8 +131,8 @@ def main(params: argparse.Namespace) -> int:
 
 
 if __name__ == "__main__":
-    params = get_cl_parameters()
-    print_cl_parameters(params)
+    params = _get_cl_parameters()
+    _print_cl_parameters(params)
 
     try:
         params.external_network_bytes = int(params.external_network_bytes)
