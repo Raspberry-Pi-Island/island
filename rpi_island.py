@@ -1,4 +1,4 @@
-from rpi_router.src import (RTNetInterface, RTDhcpClient, RTDhcpServer, RTFireWall, RTIpv4Address)
+from src import (RTNetInterface, RTDhcpClient, RTDhcpServer, RTFireWall, RTIpv4Address)
 
 from sys import exit
 import argparse
